@@ -1,10 +1,20 @@
-import { sql } from '@vercel/postgres';
+import { createPool } from '@vercel/postgres';
 
 /**
- * Cliente de banco de dados Vercel Postgres
- * Utiliza variáveis de ambiente para conexão
+ * Cliente de banco de dados Neon via Vercel
+ * Utiliza DATABASE_URL ou POSTGRES_URL do ambiente
  */
-export { sql };
+const connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+
+if (!connectionString) {
+  throw new Error('DATABASE_URL or POSTGRES_URL environment variable is not set');
+}
+
+const pool = createPool({
+  connectionString,
+});
+
+export const sql = pool.sql;
 
 /**
  * Inicializa o schema do banco de dados
