@@ -1,10 +1,16 @@
-import { sql } from '@vercel/postgres';
+import { neon } from '@neondatabase/serverless';
 
 /**
- * Cliente de banco de dados Neon via Vercel
- * O @vercel/postgres detecta automaticamente DATABASE_URL ou POSTGRES_URL
+ * Cliente de banco de dados Neon
+ * Utiliza DATABASE_URL ou POSTGRES_URL do ambiente
  */
-export { sql };
+const connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+
+if (!connectionString) {
+  throw new Error('DATABASE_URL or POSTGRES_URL environment variable is not set');
+}
+
+export const sql = neon(connectionString);
 
 /**
  * Inicializa o schema do banco de dados
