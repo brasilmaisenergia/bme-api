@@ -2,12 +2,20 @@ import { neon } from '@neondatabase/serverless';
 
 /**
  * Cliente de banco de dados Neon
- * Utiliza DATABASE_URL ou POSTGRES_URL do ambiente
+ * Utiliza POSTGRES_URL do ambiente (configurado pelo Neon via Vercel)
  */
-const connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+const connectionString = process.env.POSTGRES_URL;
+
+// Log para debug (será removido após funcionar)
+console.log('🔍 Environment variables check:');
+console.log('- POSTGRES_URL:', process.env.POSTGRES_URL ? '✅ Set' : '❌ Missing');
+console.log('- DATABASE_URL:', process.env.DATABASE_URL ? '✅ Set' : '❌ Missing');
+console.log('- NODE_ENV:', process.env.NODE_ENV);
 
 if (!connectionString) {
-  throw new Error('DATABASE_URL or POSTGRES_URL environment variable is not set');
+  const error = new Error('POSTGRES_URL environment variable is not set. Please configure Neon database in Vercel.');
+  console.error('❌', error.message);
+  throw error;
 }
 
 export const sql = neon(connectionString);
@@ -18,6 +26,8 @@ export const sql = neon(connectionString);
  */
 export async function initDatabase() {
   try {
+    console.log('📊 Initializing database schema...');
+    
     await sql`
       CREATE TABLE IF NOT EXISTS noticias (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -82,8 +92,15 @@ export async function initDatabase() {
 
     console.log('✅ Database schema initialized successfully');
     return { success: true };
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Error initializing database:', error);
-    return { success: false, error };
+    return { 
+      success: false, 
+      error: {
+        message: error.message,
+        code: error.code,
+        name: error.name
+      }
+    };
   }
 }
