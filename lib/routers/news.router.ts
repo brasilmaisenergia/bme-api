@@ -6,62 +6,26 @@ import type { Noticia, NoticiaListResponse, NoticiaStats } from '../types/news';
 /**
  * Router de Notícias
  * Sistema simplificado onde Eduardo gerencia as notícias
+ * Versão simplificada com queries básicas compatíveis com Neon
  */
 export const newsRouter = router({
   /**
-   * Listar notícias com filtros e paginação
+   * Listar notícias publicadas (versão simplificada)
    */
   list: publicProcedure
     .input(z.object({
       limite: z.number().min(1).max(100).default(20),
       pagina: z.number().min(1).default(1),
-      fonte: z.string().optional(),
-      categoria: z.string().optional(),
-      publico_alvo: z.string().optional(),
-      busca: z.string().optional(),
-      status: z.enum(['rascunho', 'publicada', 'arquivada']).optional(),
-      ordenar_por: z.enum(['data', 'relevancia']).default('data'),
     }))
     .query(async ({ input }): Promise<NoticiaListResponse> => {
-      const { limite, pagina, fonte, categoria, publico_alvo, busca, status, ordenar_por } = input;
+      const { limite, pagina } = input;
       const offset = (pagina - 1) * limite;
       
-      // Construir condições WHERE
-      const conditions: string[] = [];
-      
-      // Status padrão: apenas publicadas para público
-      if (status) {
-        conditions.push(`status = '${status}'`);
-      } else {
-        conditions.push(`status = 'publicada'`);
-      }
-      
-      if (fonte) {
-        conditions.push(`fonte = '${fonte}'`);
-      }
-      
-      if (categoria) {
-        conditions.push(`'${categoria}' = ANY(categoria)`);
-      }
-      
-      if (publico_alvo) {
-        conditions.push(`'${publico_alvo}' = ANY(publico_alvo)`);
-      }
-      
-      if (busca) {
-        conditions.push(`(titulo ILIKE '%${busca}%' OR resumo ILIKE '%${busca}%')`);
-      }
-      
-      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-      const orderClause = ordenar_por === 'relevancia' 
-        ? 'ORDER BY relevancia DESC, data_publicacao DESC'
-        : 'ORDER BY data_publicacao DESC';
-      
-      // Buscar notícias
+      // Buscar notícias publicadas
       const noticias = await sql`
         SELECT * FROM noticias 
-        ${sql.unsafe(whereClause)}
-        ${sql.unsafe(orderClause)}
+        WHERE status = 'publicada'
+        ORDER BY data_publicacao DESC
         LIMIT ${limite}
         OFFSET ${offset}
       `;
@@ -69,10 +33,46 @@ export const newsRouter = router({
       // Contar total
       const countResult = await sql`
         SELECT COUNT(*) as total FROM noticias 
-        ${sql.unsafe(whereClause)}
+        WHERE status = 'publicada'
       `;
       
-      const total = parseInt(countResult[0].total);
+      const total = parseInt(String(countResult[0].total));
+      
+      return {
+        noticias: noticias as Noticia[],
+        paginacao: {
+          pagina,
+          limite,
+          total,
+          total_paginas: Math.ceil(total / limite),
+        },
+      };
+    }),
+
+  /**
+   * Listar todas as notícias (para painel admin)
+   */
+  listAll: publicProcedure
+    .input(z.object({
+      limite: z.number().min(1).max(100).default(20),
+      pagina: z.number().min(1).default(1),
+    }))
+    .query(async ({ input }): Promise<NoticiaListResponse> => {
+      const { limite, pagina } = input;
+      const offset = (pagina - 1) * limite;
+      
+      const noticias = await sql`
+        SELECT * FROM noticias 
+        ORDER BY created_at DESC
+        LIMIT ${limite}
+        OFFSET ${offset}
+      `;
+      
+      const countResult = await sql`
+        SELECT COUNT(*) as total FROM noticias
+      `;
+      
+      const total = parseInt(String(countResult[0].total));
       
       return {
         noticias: noticias as Noticia[],
@@ -178,43 +178,37 @@ export const newsRouter = router({
 
   /**
    * Atualizar notícia (para Eduardo editar)
+   * Versão simplificada: atualiza todos os campos
    */
   update: publicProcedure
     .input(z.object({
       id: z.string().uuid(),
-      titulo: z.string().optional(),
-      resumo: z.string().optional(),
-      conteudo: z.string().optional(),
-      imagem_url: z.string().url().optional(),
-      categoria: z.array(z.string()).optional(),
-      tags: z.array(z.string()).optional(),
-      publico_alvo: z.array(z.string()).optional(),
-      relevancia: z.number().min(0).max(100).optional(),
-      analise_eduardo: z.string().optional(),
-      status: z.enum(['rascunho', 'publicada', 'arquivada']).optional(),
+      titulo: z.string(),
+      resumo: z.string().nullable(),
+      conteudo: z.string().nullable(),
+      imagem_url: z.string().url().nullable(),
+      categoria: z.array(z.string()),
+      tags: z.array(z.string()),
+      publico_alvo: z.array(z.string()),
+      relevancia: z.number().min(0).max(100),
+      analise_eduardo: z.string().nullable(),
+      status: z.enum(['rascunho', 'publicada', 'arquivada']),
     }))
     .mutation(async ({ input }) => {
-      const { id, ...updates } = input;
-      
-      // Construir SET clause dinamicamente
-      const setters: string[] = [];
-      const values: any[] = [];
-      
-      Object.entries(updates).forEach(([key, value]) => {
-        if (value !== undefined) {
-          setters.push(`${key} = $${setters.length + 1}`);
-          values.push(value);
-        }
-      });
-      
-      if (setters.length === 0) {
-        throw new Error('Nenhum campo para atualizar');
-      }
-      
       const result = await sql`
         UPDATE noticias 
-        SET ${sql.unsafe(setters.join(', '))}
-        WHERE id = ${id}
+        SET 
+          titulo = ${input.titulo},
+          resumo = ${input.resumo},
+          conteudo = ${input.conteudo},
+          imagem_url = ${input.imagem_url},
+          categoria = ${input.categoria},
+          tags = ${input.tags},
+          publico_alvo = ${input.publico_alvo},
+          relevancia = ${input.relevancia},
+          analise_eduardo = ${input.analise_eduardo},
+          status = ${input.status}
+        WHERE id = ${input.id}
         RETURNING *
       `;
       
@@ -264,23 +258,24 @@ export const newsRouter = router({
       const porCategoriaResult = await sql`
         SELECT UNNEST(categoria) as cat, COUNT(*) as count 
         FROM noticias 
+        WHERE array_length(categoria, 1) > 0
         GROUP BY cat
       `;
       
       const por_fonte: Record<string, number> = {};
       porFonteResult.forEach((row: any) => {
-        por_fonte[row.fonte] = parseInt(row.count);
+        por_fonte[row.fonte] = parseInt(String(row.count));
       });
       
       const por_categoria: Record<string, number> = {};
       porCategoriaResult.forEach((row: any) => {
-        por_categoria[row.cat] = parseInt(row.count);
+        por_categoria[row.cat] = parseInt(String(row.count));
       });
       
       return {
-        total: parseInt(totalResult[0].count),
-        publicadas: parseInt(publicadasResult[0].count),
-        rascunhos: parseInt(rascunhosResult[0].count),
+        total: parseInt(String(totalResult[0].count)),
+        publicadas: parseInt(String(publicadasResult[0].count)),
+        rascunhos: parseInt(String(rascunhosResult[0].count)),
         por_fonte,
         por_categoria,
       };
