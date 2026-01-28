@@ -6,12 +6,6 @@ import { neon } from '@neondatabase/serverless';
  */
 const connectionString = process.env.POSTGRES_URL;
 
-// Log para debug (será removido após funcionar)
-console.log('🔍 Environment variables check:');
-console.log('- POSTGRES_URL:', process.env.POSTGRES_URL ? '✅ Set' : '❌ Missing');
-console.log('- DATABASE_URL:', process.env.DATABASE_URL ? '✅ Set' : '❌ Missing');
-console.log('- NODE_ENV:', process.env.NODE_ENV);
-
 if (!connectionString) {
   const error = new Error('POSTGRES_URL environment variable is not set. Please configure Neon database in Vercel.');
   console.error('❌', error.message);
@@ -37,23 +31,23 @@ export async function initDatabase() {
         url_original TEXT NOT NULL UNIQUE,
         data_publicacao TIMESTAMP NOT NULL,
         
-        -- Conteúdo
+        -- Conteúdo (editado por Eduardo)
         titulo TEXT NOT NULL,
         resumo TEXT,
         conteudo TEXT,
         imagem_url TEXT,
         
-        -- Categorização
+        -- Categorização (feita por Eduardo)
         categoria TEXT[] DEFAULT '{}',
         tags TEXT[] DEFAULT '{}',
         publico_alvo TEXT[] DEFAULT '{}',
         
-        -- Análise
-        relevancia INTEGER DEFAULT 0 CHECK (relevancia >= 0 AND relevancia <= 100),
-        sentimento VARCHAR(20),
+        -- Análise (feita por Eduardo)
+        relevancia INTEGER DEFAULT 50 CHECK (relevancia >= 0 AND relevancia <= 100),
+        analise_eduardo TEXT,
         
         -- Controle
-        status VARCHAR(20) DEFAULT 'publicada' CHECK (status IN ('rascunho', 'publicada', 'arquivada')),
+        status VARCHAR(20) DEFAULT 'rascunho' CHECK (status IN ('rascunho', 'publicada', 'arquivada')),
         visualizacoes INTEGER DEFAULT 0,
         
         -- Timestamps
