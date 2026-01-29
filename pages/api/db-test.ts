@@ -3,6 +3,7 @@ import { neon } from '@neondatabase/serverless';
 
 /**
  * Endpoint de diagnóstico para testar conexão com Neon
+ * Tenta múltiplas variáveis de ambiente
  * GET /api/db-test
  */
 export default async function handler(
@@ -14,14 +15,24 @@ export default async function handler(
   }
   
   try {
-    // Verificar variável de ambiente
-    const connectionString = process.env.POSTGRES_URL;
+    // Listar todas as variáveis relacionadas
+    const allVars = Object.keys(process.env).filter(k => 
+      k.includes('POSTGRES') || k.includes('DATABASE') || k.includes('NEON')
+    );
+    
+    // Tentar múltiplas variáveis
+    const connectionString = 
+      process.env.POSTGRES_URL || 
+      process.env.DATABASE_URL || 
+      process.env.POSTGRES_PRISMA_URL ||
+      process.env.POSTGRES_URL_NON_POOLING;
     
     if (!connectionString) {
       return res.status(500).json({
         success: false,
-        error: 'POSTGRES_URL not found',
-        availableVars: Object.keys(process.env).filter(k => k.includes('POSTGRES') || k.includes('DATABASE'))
+        error: 'No connection string found',
+        availableVars: allVars,
+        tried: ['POSTGRES_URL', 'DATABASE_URL', 'POSTGRES_PRISMA_URL', 'POSTGRES_URL_NON_POOLING']
       });
     }
     
@@ -34,6 +45,7 @@ export default async function handler(
     return res.status(200).json({
       success: true,
       message: 'Connection successful',
+      usedVar: connectionString.includes('pooler') ? 'POSTGRES_URL (pooled)' : 'DATABASE_URL',
       data: result[0]
     });
     

@@ -2,16 +2,31 @@ import { neon } from '@neondatabase/serverless';
 
 /**
  * Cliente de banco de dados Neon
- * Utiliza POSTGRES_URL do ambiente (configurado pelo Neon via Vercel)
+ * Tenta múltiplas variáveis de ambiente como fallback
  */
-const connectionString = process.env.POSTGRES_URL;
+
+// Tentar múltiplas variáveis (Neon pode criar com nomes diferentes)
+const connectionString = 
+  process.env.POSTGRES_URL || 
+  process.env.DATABASE_URL || 
+  process.env.POSTGRES_PRISMA_URL ||
+  process.env.POSTGRES_URL_NON_POOLING;
 
 if (!connectionString) {
-  const error = new Error('POSTGRES_URL environment variable is not set. Please configure Neon database in Vercel.');
+  const availableVars = Object.keys(process.env)
+    .filter(k => k.includes('POSTGRES') || k.includes('DATABASE'))
+    .join(', ');
+    
+  const error = new Error(
+    `No database connection string found. ` +
+    `Tried: POSTGRES_URL, DATABASE_URL, POSTGRES_PRISMA_URL, POSTGRES_URL_NON_POOLING. ` +
+    `Available vars: ${availableVars || 'none'}`
+  );
   console.error('❌', error.message);
   throw error;
 }
 
+console.log('✅ Database connection string found');
 export const sql = neon(connectionString);
 
 /**
