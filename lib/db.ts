@@ -5,12 +5,12 @@ import { neon } from '@neondatabase/serverless';
  * Usa DATABASE_URL (variável padrão do Neon via integração Vercel)
  */
 
-// Usar DATABASE_URL que é a variável padrão do Neon
-const connectionString = process.env.DATABASE_URL;
+// Usar DATABASE_URL (padrão Neon) ou NEON_DATABASE_URL (fallback)
+const connectionString = process.env.DATABASE_URL || process.env.NEON_DATABASE_URL;
 
 if (!connectionString) {
   // Não lançar exceção, apenas logar
-  console.error('❌ DATABASE_URL not found in environment variables');
+  console.error('❌ DATABASE_URL and NEON_DATABASE_URL not found in environment variables');
   console.error('Available env vars:', Object.keys(process.env).filter(k => k.includes('DATABASE') || k.includes('POSTGRES') || k.includes('NEON')));
 }
 
@@ -27,7 +27,7 @@ export async function initDatabase() {
       return {
         success: false,
         error: {
-          message: 'Database connection not configured. DATABASE_URL environment variable is missing.',
+          message: 'Database connection not configured. DATABASE_URL or NEON_DATABASE_URL environment variable is missing.',
           code: 'NO_CONNECTION_STRING',
           name: 'ConfigurationError'
         }
