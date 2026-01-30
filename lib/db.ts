@@ -2,23 +2,20 @@ import { neon } from '@neondatabase/serverless';
 
 /**
  * Cliente de banco de dados Neon
- * Usa NEON_DATABASE_URL configurada manualmente no Vercel
+ * Usa DATABASE_URL (variável padrão do Neon via integração Vercel)
  */
 
-// Usar variável customizada que será adicionada manualmente
-const connectionString = process.env.NEON_DATABASE_URL;
+// Usar DATABASE_URL que é a variável padrão do Neon
+const connectionString = process.env.DATABASE_URL;
 
 if (!connectionString) {
-  const error = new Error(
-    'NEON_DATABASE_URL environment variable is not set. ' +
-    'Please add it manually in Vercel Settings → Environment Variables'
-  );
-  console.error('❌', error.message);
-  throw error;
+  // Não lançar exceção, apenas logar
+  console.error('❌ DATABASE_URL not found in environment variables');
+  console.error('Available env vars:', Object.keys(process.env).filter(k => k.includes('DATABASE') || k.includes('POSTGRES') || k.includes('NEON')));
 }
 
-console.log('✅ Database connection string found (NEON_DATABASE_URL)');
-export const sql = neon(connectionString);
+// Exportar sql mesmo se não houver connection string (para não quebrar imports)
+export const sql = connectionString ? neon(connectionString) : null as any;
 
 /**
  * Inicializa o schema do banco de dados
@@ -26,6 +23,17 @@ export const sql = neon(connectionString);
  */
 export async function initDatabase() {
   try {
+    if (!sql) {
+      return {
+        success: false,
+        error: {
+          message: 'Database connection not configured. DATABASE_URL environment variable is missing.',
+          code: 'NO_CONNECTION_STRING',
+          name: 'ConfigurationError'
+        }
+      };
+    }
+
     console.log('📊 Initializing database schema...');
     
     await sql`
