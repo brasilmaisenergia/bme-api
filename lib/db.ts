@@ -2,31 +2,22 @@ import { neon } from '@neondatabase/serverless';
 
 /**
  * Cliente de banco de dados Neon
- * Tenta múltiplas variáveis de ambiente como fallback
+ * Usa NEON_DATABASE_URL configurada manualmente no Vercel
  */
 
-// Tentar múltiplas variáveis (Neon pode criar com nomes diferentes)
-const connectionString = 
-  process.env.POSTGRES_URL || 
-  process.env.DATABASE_URL || 
-  process.env.POSTGRES_PRISMA_URL ||
-  process.env.POSTGRES_URL_NON_POOLING;
+// Usar variável customizada que será adicionada manualmente
+const connectionString = process.env.NEON_DATABASE_URL;
 
 if (!connectionString) {
-  const availableVars = Object.keys(process.env)
-    .filter(k => k.includes('POSTGRES') || k.includes('DATABASE'))
-    .join(', ');
-    
   const error = new Error(
-    `No database connection string found. ` +
-    `Tried: POSTGRES_URL, DATABASE_URL, POSTGRES_PRISMA_URL, POSTGRES_URL_NON_POOLING. ` +
-    `Available vars: ${availableVars || 'none'}`
+    'NEON_DATABASE_URL environment variable is not set. ' +
+    'Please add it manually in Vercel Settings → Environment Variables'
   );
   console.error('❌', error.message);
   throw error;
 }
 
-console.log('✅ Database connection string found');
+console.log('✅ Database connection string found (NEON_DATABASE_URL)');
 export const sql = neon(connectionString);
 
 /**
