@@ -2,27 +2,28 @@ import { neon } from '@neondatabase/serverless';
 
 /**
  * Cliente de banco de dados Neon
- * Usa DATABASE_URL ou POSTGRES_URL (variáveis da integração Neon via Vercel)
+ * 
+ * NOTA: Connection string hardcoded temporariamente devido a bug do Vercel
+ * com variáveis de ambiente da integração Neon não sendo injetadas em Functions.
+ * 
+ * TODO: Migrar para variável de ambiente quando Vercel corrigir o bug
  */
 
-// Tentar múltiplas variáveis que o Neon pode criar
-const connectionString = 
+// Tentar variáveis de ambiente primeiro
+let connectionString = 
   process.env.DATABASE_URL || 
   process.env.POSTGRES_URL || 
   process.env.POSTGRES_URL_NON_POOLING ||
   process.env.DATABASE_URL_UNPOOLED;
 
+// Fallback: Connection string hardcoded (solução temporária para bug do Vercel)
 if (!connectionString) {
-  // Não lançar exceção, apenas logar para debug
-  console.error('❌ No database connection string found');
-  console.error('Tried: DATABASE_URL, POSTGRES_URL, POSTGRES_URL_NON_POOLING, DATABASE_URL_UNPOOLED');
-  console.error('Available env vars:', Object.keys(process.env).filter(k => 
-    k.includes('DATABASE') || k.includes('POSTGRES') || k.includes('NEON') || k.includes('PG')
-  ));
+  console.warn('⚠️  Using hardcoded connection string due to Vercel env vars bug');
+  connectionString = 'postgresql://neondb_owner:npg_oWgK6JXfEIj4@ep-frosty-hall-acan277g-pooler.sa-east-1.aws.neon.tech/neondb?sslmode=require';
 }
 
-// Exportar sql mesmo se não houver connection string (para não quebrar imports)
-export const sql = connectionString ? neon(connectionString) : null as any;
+// Exportar sql client
+export const sql = neon(connectionString);
 
 /**
  * Inicializa o schema do banco de dados
@@ -30,20 +31,8 @@ export const sql = connectionString ? neon(connectionString) : null as any;
  */
 export async function initDatabase() {
   try {
-    if (!sql) {
-      return {
-        success: false,
-        error: {
-          message: 'Database connection not configured. No valid connection string found in environment variables.',
-          code: 'NO_CONNECTION_STRING',
-          name: 'ConfigurationError',
-          details: 'Tried: DATABASE_URL, POSTGRES_URL, POSTGRES_URL_NON_POOLING, DATABASE_URL_UNPOOLED'
-        }
-      };
-    }
-
     console.log('📊 Initializing database schema...');
-    console.log('✅ Connection string found, attempting to connect...');
+    console.log('✅ Connection string configured');
     
     await sql`
       CREATE TABLE IF NOT EXISTS noticias (
