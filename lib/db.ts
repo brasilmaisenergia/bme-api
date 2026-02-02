@@ -2,16 +2,23 @@ import { neon } from '@neondatabase/serverless';
 
 /**
  * Cliente de banco de dados Neon
- * Usa DATABASE_URL (variável padrão do Neon via integração Vercel)
+ * Usa DATABASE_URL ou POSTGRES_URL (variáveis da integração Neon via Vercel)
  */
 
-// Usar DATABASE_URL (variável padrão criada pela integração Neon)
-const connectionString = process.env.DATABASE_URL;
+// Tentar múltiplas variáveis que o Neon pode criar
+const connectionString = 
+  process.env.DATABASE_URL || 
+  process.env.POSTGRES_URL || 
+  process.env.POSTGRES_URL_NON_POOLING ||
+  process.env.DATABASE_URL_UNPOOLED;
 
 if (!connectionString) {
   // Não lançar exceção, apenas logar para debug
-  console.error('❌ DATABASE_URL not found in environment variables');
-  console.error('Available env vars:', Object.keys(process.env).filter(k => k.includes('DATABASE') || k.includes('POSTGRES') || k.includes('NEON')));
+  console.error('❌ No database connection string found');
+  console.error('Tried: DATABASE_URL, POSTGRES_URL, POSTGRES_URL_NON_POOLING, DATABASE_URL_UNPOOLED');
+  console.error('Available env vars:', Object.keys(process.env).filter(k => 
+    k.includes('DATABASE') || k.includes('POSTGRES') || k.includes('NEON') || k.includes('PG')
+  ));
 }
 
 // Exportar sql mesmo se não houver connection string (para não quebrar imports)
@@ -27,14 +34,16 @@ export async function initDatabase() {
       return {
         success: false,
         error: {
-          message: 'Database connection not configured. DATABASE_URL environment variable is missing.',
+          message: 'Database connection not configured. No valid connection string found in environment variables.',
           code: 'NO_CONNECTION_STRING',
-          name: 'ConfigurationError'
+          name: 'ConfigurationError',
+          details: 'Tried: DATABASE_URL, POSTGRES_URL, POSTGRES_URL_NON_POOLING, DATABASE_URL_UNPOOLED'
         }
       };
     }
 
     console.log('📊 Initializing database schema...');
+    console.log('✅ Connection string found, attempting to connect...');
     
     await sql`
       CREATE TABLE IF NOT EXISTS noticias (
@@ -107,7 +116,8 @@ export async function initDatabase() {
       error: {
         message: error.message,
         code: error.code,
-        name: error.name
+        name: error.name,
+        stack: error.stack
       }
     };
   }
